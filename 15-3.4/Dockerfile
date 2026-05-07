@@ -65,7 +65,6 @@ RUN set -eux \
     && cd /usr/src/postgis \
     && ./autogen.sh \
     && ./configure \
-        --enable-lto \
     && make -j${NPROC:-$(nproc)} \
     && make install \
     \
@@ -80,7 +79,7 @@ RUN set -eux \
     && mkdir /tempdb \
     && chown -R postgres:postgres /tempdb \
     && su postgres -c 'pg_ctl -D /tempdb init' \
-    && su postgres -c 'pg_ctl -D /tempdb -c -l /tmp/logfile -o '\'''-F'\''' start' \
+    && su postgres -c 'pg_ctl -D /tempdb -c -l /tmp/logfile -o '-F' start ' \
     && cd regress \
     && make -j${NPROC:-$(nproc)} check RUNTESTFLAGS="--extension --verbose" PGUSER=postgres \
     \

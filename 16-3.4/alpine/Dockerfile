@@ -63,7 +63,6 @@ RUN set -eux \
     && gettextize \
     && ./autogen.sh \
     && ./configure \
-        --enable-lto \
     && make -j${NPROC:-$(nproc)} \
     && make install \
     \
