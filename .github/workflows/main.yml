@@ -122,15 +122,29 @@ jobs:
     name: Build docker image for ${{ matrix.postgres }}-${{ matrix.postgis }} variant ${{ matrix.variant }}
     runs-on: ${{ matrix.runner-platform }}
     continue-on-error: ${{ matrix.postgis == 'master' }}
-    # Skip jobs that don't match the requested filter (empty input = no filter)
-    if: (github.event.inputs.postgres == '' || github.event.inputs.postgres == format('{0}', matrix.postgres)) && (github.event.inputs.postgis == '' || github.event.inputs.postgis == matrix.postgis) && (github.event.inputs.variant == '' || github.event.inputs.variant == matrix.variant)
     env:
       VERSION: ${{ matrix.postgres }}-${{ matrix.postgis }}
       VARIANT: ${{ matrix.variant }}
       DOCKER_APT_PKG_VER: '5:29.2.1-1~ubuntu.24.04~noble'
 
     steps:
+    - name: Check filter inputs
+      id: check_filter
+      run: |
+        pg_input="${{ github.event.inputs.postgres }}"
+        pgis_input="${{ github.event.inputs.postgis }}"
+        variant_input="${{ github.event.inputs.variant }}"
+        if [[ ( -z "$pg_input" || "$pg_input" == "${{ matrix.postgres }}" ) && \
+              ( -z "$pgis_input" || "$pgis_input" == "${{ matrix.postgis }}" ) && \
+              ( -z "$variant_input" || "$variant_input" == "${{ matrix.variant }}" ) ]]; then
+          echo "run=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "Skipping postgres=${{ matrix.postgres }} postgis=${{ matrix.postgis }} variant=${{ matrix.variant }}"
+          echo "run=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Install/config specific version of Docker packages
+      if: steps.check_filter.outputs.run == 'true'
       run: |
         echo "***** Removing any currently installed conflicting packages..."
         for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
@@ -170,17 +184,21 @@ jobs:
         docker info -f '{{ .DriverStatus }}'
 
     - name: Load binfmt platforms for QEMU
+      if: steps.check_filter.outputs.run == 'true'
       run: |
         docker run --privileged --rm tonistiigi/binfmt --install all
         docker images --tree
 
     - name: Checkout source
+      if: steps.check_filter.outputs.run == 'true'
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
+      if: steps.check_filter.outputs.run == 'true'
       uses: docker/setup-buildx-action@v1
 
     - name: Set Context Path
+      if: steps.check_filter.outputs.run == 'true'
       id: set-context
       run: |
         if [ "${{ matrix.variant }}" = "default" ]; then
@@ -190,6 +208,7 @@ jobs:
         fi
 
     - name: Login to GitHub Packages
+      if: steps.check_filter.outputs.run == 'true'
       uses: docker/login-action@v1
       with:
         registry: ghcr.io
@@ -197,6 +216,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build/Push docker image for ${{ env.VERSION }} ${{ env.VARIANT }}
+      if: steps.check_filter.outputs.run == 'true'
       uses: docker/build-push-action@v4
       with:
         context: ${{ env.CONTEXT_PATH }}
@@ -207,4 +227,5 @@ jobs:
         platforms: linux/amd64,linux/arm64
 
     - name: Logout of GitHub Packages
+      if: steps.check_filter.outputs.run == 'true'
       run: docker logout ghcr.io
