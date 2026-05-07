@@ -2,6 +2,19 @@ name: Docker PostGIS CI
 
 on:
   workflow_dispatch:
+    inputs:
+      postgres:
+        description: 'Postgres version to build (e.g. 15). Leave blank to build all.'
+        required: false
+        default: ''
+      postgis:
+        description: 'PostGIS version to build (e.g. 3.4). Leave blank to build all.'
+        required: false
+        default: ''
+      variant:
+        description: 'Variant to build (default or alpine). Leave blank to build all.'
+        required: false
+        default: ''
 
 env:
   IMAGE_NAME: postgis
@@ -109,6 +122,11 @@ jobs:
     name: Build docker image for ${{ matrix.postgres }}-${{ matrix.postgis }} variant ${{ matrix.variant }}
     runs-on: ${{ matrix.runner-platform }}
     continue-on-error: ${{ matrix.postgis == 'master' }}
+    # Skip jobs that don't match the requested filter (empty input = no filter)
+    if: |
+      (github.event.inputs.postgres == '' || github.event.inputs.postgres == format('{0}', matrix.postgres)) &&
+      (github.event.inputs.postgis  == '' || github.event.inputs.postgis  == matrix.postgis) &&
+      (github.event.inputs.variant  == '' || github.event.inputs.variant  == matrix.variant)
     env:
       VERSION: ${{ matrix.postgres }}-${{ matrix.postgis }}
       VARIANT: ${{ matrix.variant }}
